@@ -1,75 +1,63 @@
 // src/App.js
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import "./index.css";
 
-import { Amplify } from "aws-amplify";
-import { generateClient } from "aws-amplify/data";
-import { Authenticator } from "@aws-amplify/ui-react";
-import "@aws-amplify/ui-react/styles.css";
-
-// This file is created by earlier Amplify steps in the tutorial
-import outputs from "../amplify_outputs.json";
-
-// Configure Amplify with the backend you created (auth, API, DynamoDB, function)
-Amplify.configure(outputs);
-
-// Create a client to talk to your GraphQL API
-const client = generateClient();
-
 function App() {
-  const [profiles, setProfiles] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [email, setEmail] = useState("");
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  // Load data from the API once a user is signed in
-  useEffect(() => {
-    async function loadProfiles() {
-      try {
-        // "Profile" should match the model name from your Amplify Data schema
-        const result = await client.models.Profile.list();
-        setProfiles(result.data ?? []);
-      } catch (err) {
-        console.error("Error loading profiles:", err);
-      } finally {
-        setLoading(false);
+  // TODO: replace this with your real API Gateway invoke URL
+  const API_URL = "https://YOUR-API-ID.execute-api.YOUR-REGION.amazonaws.com/prod/signup";
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const response = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (response.ok) {
+        setMessage(data.message || "Signup saved successfully!");
+      } else {
+        setMessage(data.message || "Server returned an error.");
       }
+    } catch (err) {
+      console.error("Request error:", err);
+      setMessage("Could not connect to the server.");
+    } finally {
+      setLoading(false);
     }
-
-    loadProfiles();
-  }, []);
+  };
 
   return (
-    <Authenticator>
-      {({ user, signOut }) => (
-        <main className="App">
-          <div className="card">
-            <h1>User profile app</h1>
-            <p>
-              Signed in as:{" "}
-              <strong>{user?.signInDetails?.loginId ?? "(unknown user)"}</strong>
-            </p>
-            <button onClick={signOut}>Sign out</button>
-          </div>
+    <main className="App">
+      <h1>Signup Demo</h1>
+      <form className="card" onSubmit={handleSubmit}>
+        <label>
+          Email:
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            style={{ marginLeft: "0.5rem" }}
+          />
+        </label>
 
-          <section>
-            <h2>Profiles from the database</h2>
+        <button type="submit" disabled={loading} style={{ marginTop: "1rem" }}>
+          {loading ? "Sending..." : "Submit"}
+        </button>
+      </form>
 
-            {loading && <p>Loading profiles...</p>}
-
-            {!loading && profiles.length === 0 && (
-              <p>No profiles found yet.</p>
-            )}
-
-            <ul>
-              {profiles.map((p) => (
-                <li key={p.id}>
-                  {p.email ?? "(no email)"} — id: {p.id}
-                </li>
-              ))}
-            </ul>
-          </section>
-        </main>
-      )}
-    </Authenticator>
+      {message && <p style={{ marginTop: "1rem" }}>{message}</p>}
+    </main>
   );
 }
 
